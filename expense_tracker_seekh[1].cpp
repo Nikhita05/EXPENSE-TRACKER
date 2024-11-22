@@ -1,150 +1,168 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <map>
+#include <vector>
+#include <string>
 
-// Structure to represent a date
-struct Date {
-    int day;
-    int month;
-    int year;
-};
+using namespace std;
 
-// Structure to represent an expense
 struct Expense {
-    char description[100];
+    string category;
+    string description;
     float amount;
-    struct Date date;
+    struct {
+        int day, month, year;
+    } date;
 };
 
-// Function to add an expense
-void addExpense(struct Expense expenses[], int *count, float spendingLimit, float *totalSpent) {
-    if (*count < 100) {
-        printf("Enter expense description: ");
-        if (scanf("%99s", expenses[*count].description) != 1) {
-            printf("Error reading description.\n");
-            return;
-        }
+void addExpense(vector<Expense> &expenses, float &totalSpent);
+void viewExpenses(const vector<Expense> &expenses);
+void generateReport(const vector<Expense> &expenses, float totalSpent, float spendingLimit);
+void saveReportToFile(const map<string, float> &categoryWise, const map<string, float> &dateWise, float totalSpent, float spendingLimit);
+void setMonthlySpendingLimit(float &spendingLimit);
 
-        printf("Enter expense amount: ");
-        if (scanf("%f", &expenses[*count].amount) != 1) {
-            printf("Error reading amount.\n");
-            return;
-        }
+int main() {
+    vector<Expense> expenses;  // List of all expenses
+    float totalSpent = 0.0f;   // Total amount spent
+    float spendingLimit = 5000.0f; // Default monthly spending limit
+    int choice;
 
-        printf("Enter expense date (dd mm yy): ");
-        if (scanf("%d %d %d", &expenses[*count].date.day, &expenses[*count].date.month, &expenses[*count].date.year) != 3) {
-            printf("Error reading date.\n");
-            return;
-        }
+    do {
+        cout << "\n--- Expense Tracker ---\n";
+        cout << "1. Add Expense\n";
+        cout << "2. View All Expenses\n";
+        cout << "3. Generate Report\n";
+        cout << "4. Set/Update Monthly Spending Limit\n";
+        cout << "5. Exit\n";
+        cout << "Enter your choice: ";
+        cin >> choice;
 
-        // Check if a monthly spending limit is set
-        if (spendingLimit > 0) {
-            // Check if the expense exceeds the remaining spending limit
-            if (expenses[*count].amount > spendingLimit - *totalSpent) {
-                printf("Error: Expense exceeds the remaining spending limit.\n");
-                printf("Remaining Spending Limit: %.2f/-\n", spendingLimit - *totalSpent);
-                return;
-            } else {
-                *totalSpent += expenses[*count].amount;
-                printf("Expense added successfully!\n");
-                printf("Remaining Spending Limit: %.2f/-\n", spendingLimit - *totalSpent);
-            }
-        } else {
-            *totalSpent += expenses[*count].amount;
-            printf("Expense added successfully!\n");
+        switch (choice) {
+        case 1:
+            addExpense(expenses, totalSpent);
+            break;
+        case 2:
+            viewExpenses(expenses);
+            break;
+        case 3:
+            generateReport(expenses, totalSpent, spendingLimit);
+            break;
+        case 4:
+            setMonthlySpendingLimit(spendingLimit);
+            break;
+        case 5:
+            cout << "Exiting Expense Tracker. Goodbye!\n";
+            break;
+        default:
+            cout << "Invalid choice! Please try again.\n";
         }
+    } while (choice != 5);
 
-        (*count)++;
-    } else {
-        printf("Error: Maximum number of expenses reached.\n");
+    return 0;
+}
+
+void addExpense(vector<Expense> &expenses, float &totalSpent) {
+    Expense newExpense;
+
+    cout << "\nEnter expense details:\n";
+    cout << "Category: ";
+    cin >> newExpense.category;
+    cout << "Description: ";
+    cin.ignore(); // Clear the input buffer
+    getline(cin, newExpense.description);
+    cout << "Amount: ";
+    cin >> newExpense.amount;
+    cout << "Date (DD MM YYYY): ";
+    cin >> newExpense.date.day >> newExpense.date.month >> newExpense.date.year;
+
+    expenses.push_back(newExpense);
+    totalSpent += newExpense.amount;
+
+    cout << "Expense added successfully!\n";
+}
+
+void viewExpenses(const vector<Expense> &expenses) {
+    if (expenses.empty()) {
+        cout << "No expenses recorded yet.\n";
+        return;
+    }
+    cout << "\n--- All Expenses ---\n";
+    for (const auto &expense : expenses) {
+        cout << "Category: " << expense.category << "\n";
+        cout << "Description: " << expense.description << "\n";
+        cout << "Amount: " << fixed << setprecision(2) << expense.amount << "/-\n";
+        cout << "Date: " << expense.date.day << "/" << expense.date.month << "/" << expense.date.year << "\n";
+        cout << "-------------------------\n";
     }
 }
 
-// Function to view total expenses
-void viewTotalExpenses(struct Expense expenses[], int count) {
-    float total = 0;
-
-    for (int i = 0; i < count; i++) {
-        total += expenses[i].amount;
-    }
-
-    printf("Total Expenses: %.2f/-\n", total);
-}
-
-// Function to view individual expenses
-void viewIndividualExpenses(struct Expense expenses[], int count) {
-    if (count == 0) {
-        printf("No expenses recorded yet.\n");
+void generateReport(const vector<Expense> &expenses, float totalSpent, float spendingLimit) {
+    if (expenses.empty()) {
+        cout << "No expenses recorded yet.\n";
         return;
     }
 
-    printf("Individual Expenses:\n");
-    for (int i = 0; i < count; i++) {
-        printf("%d. Description: %s, Amount: %.2f/-, Date: %02d/%02d/%02d\n", i + 1, expenses[i].description, expenses[i].amount,
-               expenses[i].date.day, expenses[i].date.month, expenses[i].date.year);
+    map<string, float> categoryWise;
+    map<string, float> dateWise;  
+
+
+    for (const auto &expense : expenses) {
+        categoryWise[expense.category] += expense.amount;
+
+        string dateStr = to_string(expense.date.day) + "/" +
+                         to_string(expense.date.month) + "/" +
+                         to_string(expense.date.year);
+        dateWise[dateStr] += expense.amount;
     }
-}
 
-// Function to set monthly spending limit
-float setMonthlyLimit(float *spendingLimit) {
-    printf("Enter your monthly spending limit: ");
-    if (scanf("%f", spendingLimit) != 1) {
-        printf("Error reading spending limit.\n");
-        return 0;
+    cout << "\n--- Expense Report ---\n";
+    cout << "Total Expenses: " << fixed << setprecision(2) << totalSpent << "/-\n";
+    cout << "Monthly Spending Limit: " << spendingLimit << "/-\n";
+    cout << "Remaining Limit: " << (spendingLimit - totalSpent) << "/-\n\n";
+
+    cout << "Category-Wise Breakdown:\n";
+    for (const auto &entry : categoryWise) {
+        cout << "- " << entry.first << ": " << fixed << setprecision(2) << entry.second << "/-\n";
     }
-    printf("Monthly spending limit set to %.2f/-\n", *spendingLimit);
-    return *spendingLimit;
+
+    cout << "\nDate-Wise Breakdown:\n";
+    for (const auto &entry : dateWise) {
+        cout << "- " << entry.first << ": " << fixed << setprecision(2) << entry.second << "/-\n";
+    }
+
+    saveReportToFile(categoryWise, dateWise, totalSpent, spendingLimit);
 }
 
-// Function to display remaining spending limit
-void displayRemainingLimit(float spendingLimit, float totalSpent) {
-    float remaining = spendingLimit - totalSpent;
-    printf("Remaining Spending Limit: %.2f/-\n", remaining);
+void saveReportToFile(const map<string, float> &categoryWise, const map<string, float> &dateWise, float totalSpent, float spendingLimit) {
+    ofstream reportFile("Expense_Report.txt");
+    if (!reportFile) {
+        cout << "Error: Could not create report file.\n";
+        return;
+    }
+
+    reportFile << "--- Expense Report ---\n";
+    reportFile << "Total Expenses: " << fixed << setprecision(2) << totalSpent << "/-\n";
+    reportFile << "Monthly Spending Limit: " << spendingLimit << "/-\n";
+    reportFile << "Remaining Limit: " << (spendingLimit - totalSpent) << "/-\n\n";
+
+    reportFile << "Category-Wise Breakdown:\n";
+    for (const auto &entry : categoryWise) {
+        reportFile << "- " << entry.first << ": " << fixed << setprecision(2) << entry.second << "/-\n";
+    }
+
+    reportFile << "\nDate-Wise Breakdown:\n";
+    for (const auto &entry : dateWise) {
+        reportFile << "- " << entry.first << ": " << fixed << setprecision(2) << entry.second << "/-\n";
+    }
+
+    reportFile.close();
+    cout << "Report saved to 'Expense_Report.txt'.\n";
 }
 
-int main() {
-    struct Expense expenses[100];  // Assuming a maximum of 100 expenses
-    int count = 0;
-    int choice;
-    float spendingLimit = 0;
-    float totalSpent = 0;
-
-    do {
-        printf("\nExpense Tracker Menu:\n");
-        printf("1. Add Expense\n");
-        printf("2. View Total Expenses\n");
-        printf("3. View Individual Expenses\n");
-        printf("4. Set Monthly Spending Limit\n");
-        printf("5. Display Remaining Spending Limit\n");
-        printf("6. Exit\n");
-        printf("Enter your choice: ");
-        if (scanf("%d", &choice) != 1) {
-            printf("Error reading choice.\n");
-            return 1;
-        }
-
-        switch (choice) {
-            case 1:
-                addExpense(expenses, &count, spendingLimit, &totalSpent);
-                break;
-            case 2:
-                viewTotalExpenses(expenses, count);
-                break;
-            case 3:
-                viewIndividualExpenses(expenses, count);
-                break;
-            case 4:
-                spendingLimit = setMonthlyLimit(&spendingLimit);
-                break;
-            case 5:
-                displayRemainingLimit(spendingLimit, totalSpent);
-                break;
-            case 6:
-                printf("Exiting...\n");
-                break;
-            default:
-                printf("Invalid choice. Please try again.\n");
-        }
-    } while (choice != 6);
-
-    return 0;
+void setMonthlySpendingLimit(float &spendingLimit) {
+    cout << "Current Spending Limit: " << spendingLimit << "/-\n";
+    cout << "Enter new spending limit: ";
+    cin >> spendingLimit;
+    cout << "Spending limit updated to: " << spendingLimit << "/-\n";
 }
